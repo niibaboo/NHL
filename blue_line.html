@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Blue Line — NHL Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ice:#EAF2F7;
+    --ice-dim:#C7D6E5;
+    --rink:#0B1830;
+    --rink-card:#122447;
+    --rink-card-2:#182E56;
+    --blueline:#2F6FED;
+    --blueline-soft:#4C86FF;
+    --goal-red:#E4384A;
+    --muted:#8AA0C2;
+    --border:#233A66;
+    --win-green:#37B37E;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top, #10203F 0%, var(--rink) 55%),
+      var(--rink);
+    color:var(--ice);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    padding-bottom:48px;
+  }
+  .display{font-family:'Barlow Condensed',system-ui,sans-serif; font-weight:700; letter-spacing:0.01em;}
+  a{color:inherit;}
+
+  header.top{
+    padding:22px 18px 16px;
+    border-bottom:2px solid var(--border);
+    position:relative;
+    overflow:hidden;
+  }
+  header.top::before{
+    content:"";
+    position:absolute; left:0; right:0; top:0; height:4px;
+    background:linear-gradient(90deg, var(--blueline) 0 35%, var(--goal-red) 35% 38%, transparent 38%);
+    opacity:.9;
+  }
+  .brand{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  .brand h1{
+    font-size:clamp(30px,7vw,42px);
+    margin:0;
+    line-height:0.95;
+  }
+  .brand .puck{
+    display:inline-block; width:.5em; height:.5em; border-radius:50%;
+    background:var(--goal-red); vertical-align:middle; margin-right:4px;
+  }
+  .tagline{color:var(--muted); font-size:14px; margin-top:6px; max-width:60ch;}
+
+  .datebar{
+    display:flex; align-items:center; gap:10px;
+    padding:14px 18px; border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,0.02);
+  }
+  .datebar button{
+    background:var(--rink-card); border:1px solid var(--border); color:var(--ice);
+    border-radius:8px; padding:8px 12px; font-size:15px; cursor:pointer;
+  }
+  .datebar button:active{transform:translateY(1px);}
+  .datebar .label{font-family:'Barlow Condensed'; font-weight:600; font-size:19px; flex:1; text-align:center;}
+
+  .status{padding:14px 18px; color:var(--muted); font-size:14px;}
+  .status.error{color:#FFB3B8;}
+
+  .slate{
+    display:flex; gap:12px; overflow-x:auto; padding:16px 18px 6px;
+    scroll-snap-type:x proximity;
+  }
+  .gcard{
+    scroll-snap-align:start;
+    flex:0 0 auto; width:210px;
+    background:var(--rink-card); border:1px solid var(--border); border-radius:12px;
+    padding:14px; cursor:pointer; transition:border-color .15s, transform .1s;
+  }
+  .gcard.active{border-color:var(--blueline-soft); box-shadow:0 0 0 1px var(--blueline-soft) inset;}
+  .gcard:active{transform:scale(.98);}
+  .gcard .teams{font-family:'Barlow Condensed'; font-weight:600; font-size:20px; display:flex; justify-content:space-between;}
+  .gcard .proj{color:var(--muted); font-size:13px; margin-top:6px;}
+  .gcard .time{color:var(--muted); font-size:12px; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;}
+
+  main{padding:8px 18px 0;}
+  section.detail{
+    background:var(--rink-card); border:1px solid var(--border); border-radius:14px;
+    padding:20px; margin-top:14px;
+  }
+  .matchup-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  .matchup-head h2{font-family:'Barlow Condensed'; font-size:clamp(26px,6vw,34px); margin:0; font-weight:700;}
+  .matchup-head .sub{color:var(--muted); font-size:13px;}
+
+  .score-line{
+    display:flex; align-items:center; justify-content:center; gap:18px;
+    margin:18px 0 6px; font-family:'Barlow Condensed'; font-weight:700;
+  }
+  .score-line .num{font-size:clamp(38px,10vw,56px); line-height:1;}
+  .score-line .abbr{font-size:16px; color:var(--muted); font-weight:600; display:block; text-align:center;}
+  .score-line .at{color:var(--muted); font-size:22px; align-self:center;}
+
+  .winbar{height:10px; border-radius:6px; overflow:hidden; display:flex; margin:14px 0 6px; border:1px solid var(--border);}
+  .winbar .seg{height:100%;}
+  .winbar .home{background:var(--blueline);}
+  .winbar .away{background:var(--goal-red);}
+  .winlabels{display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:14px;}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px;}
+  @media (max-width:520px){.grid2{grid-template-columns:1fr;}}
+
+  h3.block-title{
+    font-family:'Barlow Condensed'; font-weight:600; font-size:19px; margin:0 0 10px;
+    color:var(--ice-dim); border-bottom:1px solid var(--border); padding-bottom:6px;
+  }
+
+  .ou-row{display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:14px;}
+  .ou-row .line{width:52px; color:var(--muted); font-family:'Barlow Condensed'; font-size:16px;}
+  .ou-bar{flex:1; height:16px; background:var(--rink-card-2); border-radius:4px; overflow:hidden; position:relative;}
+  .ou-bar .fill{height:100%; background:var(--blueline-soft);}
+  .ou-row .pct{width:44px; text-align:right; color:var(--ice-dim); font-variant-numeric:tabular-nums;}
+
+  .scoreline-list{list-style:none; margin:0; padding:0; font-size:14px;}
+  .scoreline-list li{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--border);}
+  .scoreline-list li:last-child{border-bottom:none;}
+  .scoreline-list .pct{color:var(--blueline-soft); font-variant-numeric:tabular-nums;}
+
+  table.props{width:100%; border-collapse:collapse; font-size:13.5px;}
+  table.props th{
+    text-align:left; color:var(--muted); font-weight:600; font-size:11.5px;
+    text-transform:none; padding:6px 6px; border-bottom:1px solid var(--border);
+  }
+  table.props td{padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.05);}
+  table.props td.num, table.props th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  table.props tr:last-child td{border-bottom:none;}
+  .pos-tag{color:var(--muted); font-size:11px;}
+
+  .props-block{margin-top:22px;}
+  .props-tabs{display:flex; gap:8px; margin-bottom:10px;}
+  .props-tabs button{
+    flex:1; background:var(--rink-card-2); border:1px solid var(--border); color:var(--ice-dim);
+    border-radius:8px; padding:8px; font-family:'Barlow Condensed'; font-weight:600; font-size:15px; cursor:pointer;
+  }
+  .props-tabs button.active{background:var(--blueline); border-color:var(--blueline); color:#fff;}
+  .props-panel{display:none; overflow-x:auto;}
+  .props-panel.active{display:block;}
+
+  footer{
+    padding:22px 18px 0; color:var(--muted); font-size:12px; text-align:center; line-height:1.6;
+  }
+  footer a{text-decoration:underline;}
+
+  .skel{background:linear-gradient(90deg, var(--rink-card) 25%, var(--rink-card-2) 37%, var(--rink-card) 63%); background-size:400% 100%; animation:shimmer 1.4s infinite;}
+  @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1 class="display"><span class="puck"></span>Blue Line</h1>
+  </div>
+  <div class="tagline">Live NHL projections — team goals, total-goals over/under, and player props, built from current standings and club stats straight off the NHL API.</div>
+</header>
+
+<div class="datebar">
+  <button id="prevDay" aria-label="Previous day">&larr;</button>
+  <div class="label" id="dateLabel">Loading…</div>
+  <button id="nextDay" aria-label="Next day">&rarr;</button>
+</div>
+
+<div id="status" class="status">Fetching today's slate…</div>
+<div class="slate" id="slate"></div>
+
+<main>
+  <section class="detail" id="detail" style="display:none;"></section>
+</main>
+
+<footer>
+  Data: NHL public API (api-web.nhle.com). Model: independent Poisson on home/road attack &amp; defense
+  rates from current standings, dampened for player shot-volume props. For entertainment / research use
+  only — not betting advice.<br>Sibling of Corner Flag (football) and Deuce Point (tennis).
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+const BASE = "https://api-web.nhle.com/v1";
+const PROXIES = [
+  u => u, // try direct first
+  u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+];
+
+async function fetchJSON(path){
+  const url = BASE + path;
+  let lastErr;
+  for (const wrap of PROXIES){
+    try{
+      const res = await fetch(wrap(url), {headers:{"Accept":"application/json"}});
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error("fetch failed");
+}
+
+// ---------- Poisson helpers ----------
+function factorial(n){ let r=1; for(let i=2;i<=n;i++) r*=i; return r; }
+function poissonPMF(k, lam){ return Math.exp(-lam) * Math.pow(lam,k) / factorial(k); }
+function poissonCDF(k, lam){ let s=0; for(let i=0;i<=k;i++) s+=poissonPMF(i,lam); return s; }
+function overProb(line, lam){ const t = Math.floor(line)+1; return 1 - poissonCDF(t-1, lam); }
+
+// ---------- League model ----------
+function buildLeagueModel(standingsArr){
+  const byAbbrev = {};
+  standingsArr.forEach(t => byAbbrev[t.teamAbbrev.default] = t);
+
+  let totalHomeGF=0, totalHomeGP=0, totalRoadGF=0, totalRoadGP=0;
+  standingsArr.forEach(t=>{
+    totalHomeGF += t.homeGoalsFor; totalHomeGP += t.homeGamesPlayed;
+    totalRoadGF += t.roadGoalsFor; totalRoadGP += t.roadGamesPlayed;
+  });
+  const leagueAvgHomeGF = totalHomeGF / Math.max(totalHomeGP,1);
+  const leagueAvgRoadGF = totalRoadGF / Math.max(totalRoadGP,1);
+
+  function rates(abbrev){
+    const t = byAbbrev[abbrev];
+    if (!t) return null;
+    return {
+      homeGfPg: t.homeGoalsFor / Math.max(t.homeGamesPlayed,1),
+      homeGaPg: t.homeGoalsAgainst / Math.max(t.homeGamesPlayed,1),
+      roadGfPg: t.roadGoalsFor / Math.max(t.roadGamesPlayed,1),
+      roadGaPg: t.roadGoalsAgainst / Math.max(t.roadGamesPlayed,1),
+      gfPg: t.goalFor / Math.max(t.gamesPlayed,1),
+      gaPg: t.goalAgainst / Math.max(t.gamesPlayed,1),
+      teamName: (t.teamCommonName && t.teamCommonName.default) || abbrev,
+    };
+  }
+
+  function gameLambdas(homeAb, awayAb){
+    const h = rates(homeAb), a = rates(awayAb);
+    if (!h || !a) return null;
+    let lh = (h.homeGfPg * a.roadGaPg) / leagueAvgRoadGF;
+    let la = (a.roadGfPg * h.homeGaPg) / leagueAvgHomeGF;
+    lh = Math.min(Math.max(lh, 0.5), 6.0);
+    la = Math.min(Math.max(la, 0.5), 6.0);
+    return {lambdaHome: lh, lambdaAway: la};
+  }
+
+  return {byAbbrev, rates, gameLambdas, leagueAvgHomeGF, leagueAvgRoadGF};
+}
+
+function scoreGrid(lh, la, maxGoals){
+  maxGoals = maxGoals || 8;
+  const rows = [];
+  for(let h=0; h<=maxGoals; h++){
+    for(let a=0; a<=maxGoals; a++){
+      rows.push({h, a, p: poissonPMF(h,lh)*poissonPMF(a,la)});
+    }
+  }
+  return rows;
+}
+
+function predictGame(model, homeAb, awayAb){
+  const lambdas = model.gameLambdas(homeAb, awayAb);
+  if (!lambdas) return null;
+  const {lambdaHome, lambdaAway} = lambdas;
+  const total = lambdaHome + lambdaAway;
+  const grid = scoreGrid(lambdaHome, lambdaAway);
+  let homeWin=0, draw=0, awayWin=0;
+  grid.forEach(c=>{ if(c.h>c.a) homeWin+=c.p; else if(c.h===c.a) draw+=c.p; else awayWin+=c.p; });
+  const top = grid.slice().sort((x,y)=>y.p-x.p).slice(0,5);
+  const lines = [4.5,5.5,6.5];
+  const ou = {};
+  lines.forEach(l => ou[l] = overProb(l, total));
+  return {
+    homeAb, awayAb, lambdaHome, lambdaAway, total,
+    homeWinPct: homeWin + draw*0.55,
+    awayWinPct: awayWin + draw*0.45,
+    topScores: top, ou,
+  };
+}
+
+// ---------- Player props ----------
+const clubStatsCache = {};
+async function getClubStats(teamAb){
+  if (clubStatsCache[teamAb]) return clubStatsCache[teamAb];
+  const data = await fetchJSON(`/club-stats/${teamAb}/now`);
+  clubStatsCache[teamAb] = data.skaters || [];
+  return clubStatsCache[teamAb];
+}
+
+async function predictPlayerProps(model, teamAb, oppAb, isHome){
+  const lambdas = model.gameLambdas(isHome ? teamAb : oppAb, isHome ? oppAb : teamAb);
+  if (!lambdas) return [];
+  const teamGameLambda = isHome ? lambdas.lambdaHome : lambdas.lambdaAway;
+  const seasonGfPg = model.rates(teamAb).gfPg;
+  const paceFactor = teamGameLambda / Math.max(seasonGfPg, 0.1);
+  const shotsFactor = 1 + 0.5*(paceFactor - 1);
+
+  const skaters = await getClubStats(teamAb);
+  const props = skaters
+    .filter(p => (p.gamesPlayed||0) >= 10)
+    .map(p=>{
+      const gp = p.gamesPlayed;
+      const goalsPg = p.goals/gp, pointsPg = p.points/gp, shotsPg = p.shots/gp;
+      const lamGoal = goalsPg*paceFactor, lamPoint = pointsPg*paceFactor, lamShot = shotsPg*shotsFactor;
+      return {
+        name: `${p.firstName.default} ${p.lastName.default}`,
+        pos: p.positionCode || "",
+        pAnytimeGoal: 1 - poissonPMF(0, lamGoal),
+        p1PlusPoints: 1 - poissonPMF(0, lamPoint),
+        sogExpected: lamShot,
+        sogOver1_5: overProb(1.5, lamShot),
+        sogOver2_5: overProb(2.5, lamShot),
+      };
+    })
+    .sort((a,b)=>b.pAnytimeGoal - a.pAnytimeGoal)
+    .slice(0,10);
+  return props;
+}
+
+// ---------- App state ----------
+let standings = null, model = null, currentDate = null, games = [], selectedGame = null;
+const statusEl = document.getElementById("status");
+const slateEl = document.getElementById("slate");
+const detailEl = document.getElementById("detail");
+const dateLabelEl = document.getElementById("dateLabel");
+
+function fmtDate(d){
+  return d.toISOString().slice(0,10);
+}
+function prettyDate(d){
+  return d.toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+}
+
+async function loadStandings(){
+  const data = await fetchJSON("/standings/now");
+  standings = data.standings;
+  model = buildLeagueModel(standings);
+}
+
+async function loadSchedule(dateStr){
+  const data = await fetchJSON(`/schedule/${dateStr}`);
+  let list = [];
+  (data.gameWeek || []).forEach(w => { if (w.date === dateStr) list = list.concat(w.games); });
+  return list;
+}
+
+function teamShort(t){ return t.abbrev; }
+
+function renderSlate(){
+  slateEl.innerHTML = "";
+  if (!games.length){
+    statusEl.textContent = "No games scheduled this day — try the arrows to jump to the next slate.";
+    statusEl.className = "status";
+    detailEl.style.display = "none";
+    return;
+  }
+  statusEl.textContent = "";
+  games.forEach((g, idx)=>{
+    const home = teamShort(g.homeTeam), away = teamShort(g.awayTeam);
+    const card = document.createElement("div");
+    card.className = "gcard" + (selectedGame === idx ? " active" : "");
+    let projTxt = "…";
+    const pred = predictGame(model, home, away);
+    if (pred) projTxt = `${away} ${pred.lambdaAway.toFixed(1)} – ${pred.lambdaHome.toFixed(1)} ${home}`;
+    const t = new Date(g.startTimeUTC);
+    card.innerHTML = `
+      <div class="teams"><span>${away}</span><span style="color:var(--muted)">@</span><span>${home}</span></div>
+      <div class="proj">${projTxt}</div>
+      <div class="time">${t.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</div>
+    `;
+    card.addEventListener("click", ()=>{ selectedGame = idx; renderSlate(); renderDetail(); });
+    slateEl.appendChild(card);
+  });
+}
+
+function ouRowHTML(line, p){
+  const pct = Math.round(p*100);
+  return `<div class="ou-row">
+    <div class="line">O${line}</div>
+    <div class="ou-bar"><div class="fill" style="width:${pct}%"></div></div>
+    <div class="pct">${pct}%</div>
+  </div>`;
+}
+
+function propsTableHTML(props){
+  if (!props.length) return `<div style="color:var(--muted); font-size:13px;">No qualifying skaters (min. 10 GP) found.</div>`;
+  let rows = props.map(p => `
+    <tr>
+      <td>${p.name} <span class="pos-tag">${p.pos}</span></td>
+      <td class="num">${Math.round(p.pAnytimeGoal*100)}%</td>
+      <td class="num">${Math.round(p.p1PlusPoints*100)}%</td>
+      <td class="num">${p.sogExpected.toFixed(1)}</td>
+      <td class="num">${Math.round(p.sogOver1_5*100)}%</td>
+      <td class="num">${Math.round(p.sogOver2_5*100)}%</td>
+    </tr>`).join("");
+  return `<table class="props">
+    <thead><tr>
+      <th>Skater</th><th class="num">Anytime&nbsp;G</th><th class="num">1+ Pts</th>
+      <th class="num">SOG proj</th><th class="num">O1.5</th><th class="num">O2.5</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function renderDetail(){
+  if (selectedGame === null || !games[selectedGame]){ detailEl.style.display = "none"; return; }
+  const g = games[selectedGame];
+  const home = teamShort(g.homeTeam), away = teamShort(g.awayTeam);
+  const pred = predictGame(model, home, away);
+  detailEl.style.display = "block";
+  if (!pred){
+    detailEl.innerHTML = `<div class="status error">No standings data yet for ${away} or ${home}.</div>`;
+    return;
+  }
+  const homePct = Math.round(pred.homeWinPct*100), awayPct = 100-homePct;
+  const scoreLines = pred.topScores.map(s =>
+    `<li><span>${away} ${s.a} – ${s.h} ${home}</span><span class="pct">${(s.p*100).toFixed(1)}%</span></li>`
+  ).join("");
+
+  detailEl.innerHTML = `
+    <div class="matchup-head">
+      <h2 class="display">${away} @ ${home}</h2>
+      <div class="sub">${model.rates(away).teamName} at ${model.rates(home).teamName}</div>
+    </div>
+    <div class="score-line">
+      <div><div class="num">${pred.lambdaAway.toFixed(2)}</div><span class="abbr">${away}</span></div>
+      <div class="at">–</div>
+      <div><div class="num">${pred.lambdaHome.toFixed(2)}</div><span class="abbr">${home}</span></div>
+    </div>
+    <div class="winbar"><div class="seg away" style="width:${awayPct}%"></div><div class="seg home" style="width:${homePct}%"></div></div>
+    <div class="winlabels"><span>${away} ${awayPct}%</span><span>${home} ${homePct}%</span></div>
+
+    <div class="grid2">
+      <div>
+        <h3 class="block-title">Total goals — over/under</h3>
+        ${Object.entries(pred.ou).map(([line,p]) => ouRowHTML(line,p)).join("")}
+      </div>
+      <div>
+        <h3 class="block-title">Most likely scorelines</h3>
+        <ul class="scoreline-list">${scoreLines}</ul>
+      </div>
+    </div>
+
+    <div class="props-block">
+      <h3 class="block-title">Player props</h3>
+      <div class="props-tabs">
+        <button class="tab-away active" data-team="away">${away}</button>
+        <button class="tab-home" data-team="home">${home}</button>
+      </div>
+      <div class="props-panel active" id="panel-away"><div class="skel" style="height:120px;border-radius:8px;"></div></div>
+      <div class="props-panel" id="panel-home"><div class="skel" style="height:120px;border-radius:8px;"></div></div>
+    </div>
+  `;
+
+  detailEl.querySelectorAll(".props-tabs button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      detailEl.querySelectorAll(".props-tabs button").forEach(b=>b.classList.remove("active"));
+      detailEl.querySelectorAll(".props-panel").forEach(p=>p.classList.remove("active"));
+      btn.classList.add("active");
+      detailEl.querySelector(`#panel-${btn.dataset.team}`).classList.add("active");
+    });
+  });
+
+  predictPlayerProps(model, away, home, false).then(props=>{
+    const el = detailEl.querySelector("#panel-away");
+    if (el) el.innerHTML = propsTableHTML(props);
+  }).catch(()=>{
+    const el = detailEl.querySelector("#panel-away");
+    if (el) el.innerHTML = `<div class="status error">Couldn't load ${away} skater stats.</div>`;
+  });
+  predictPlayerProps(model, home, away, true).then(props=>{
+    const el = detailEl.querySelector("#panel-home");
+    if (el) el.innerHTML = propsTableHTML(props);
+  }).catch(()=>{
+    const el = detailEl.querySelector("#panel-home");
+    if (el) el.innerHTML = `<div class="status error">Couldn't load ${home} skater stats.</div>`;
+  });
+}
+
+async function loadDate(d){
+  currentDate = d;
+  const dStr = fmtDate(d);
+  dateLabelEl.textContent = prettyDate(d);
+  statusEl.textContent = "Loading slate…";
+  statusEl.className = "status";
+  slateEl.innerHTML = "";
+  detailEl.style.display = "none";
+  selectedGame = null;
+  try{
+    games = await loadSchedule(dStr);
+    selectedGame = games.length ? 0 : null;
+    renderSlate();
+    if (selectedGame !== null) renderDetail();
+  }catch(e){
+    statusEl.textContent = "Couldn't load the schedule (network or NHL API issue). Try again shortly.";
+    statusEl.className = "status error";
+  }
+}
+
+document.getElementById("prevDay").addEventListener("click", ()=>{
+  const d = new Date(currentDate); d.setDate(d.getDate()-1); loadDate(d);
+});
+document.getElementById("nextDay").addEventListener("click", ()=>{
+  const d = new Date(currentDate); d.setDate(d.getDate()+1); loadDate(d);
+});
+
+(async function init(){
+  try{
+    statusEl.textContent = "Fetching current standings…";
+    await loadStandings();
+    await loadDate(new Date());
+  }catch(e){
+    statusEl.textContent = "Couldn't reach the NHL API. Check your connection and reload.";
+    statusEl.className = "status error";
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
